@@ -9,6 +9,7 @@ about to show, runs it, and ends with the checker.
 | `r1.sh` | 1,000 drivers; ingest rate, lag, latency board | todo |
 | `r2.sh` | Ten dashboards, each its own area; kill a gateway replica | todo |
 | `r3.sh` | Zones light up; rebuild from log equals live | todo |
+| `r3b.sh` | Public URL live; rejected unauthenticated write; token expiry; cost panel | todo |
 | `r4a.sh` | Orders assigned live; burst, restart, border test; checker | todo |
 | `r4b.sh` | Offers declined and expired; late accept rejected | todo |
 | `r5.sh` | Replay a driver's day | todo |

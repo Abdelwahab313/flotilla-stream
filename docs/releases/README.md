@@ -1,6 +1,6 @@
 # Releases
 
-Thirteen thin vertical slices in strict order, sized relative to each other
+Fourteen thin vertical slices in strict order, sized relative to each other
 (S < M < L, roughly 1 : 1.5 : 2.5). No dates: the build is AI-paired and the
 only clock is the interview calendar. A slice closes when every exit criterion
 in its file is ticked and the tag exists. One slice is `open` at a time.
@@ -11,6 +11,7 @@ in its file is ticked and the tag exists. One slice is `open` at a time.
 | R1 Load source and baseline | M | Thousands of simulated drivers on real roads; first throughput and lag numbers | 1,000 drivers moving; baseline in README | — |
 | R2 Live dispatcher view | M | Cell-based live fan-out to many dashboards | Ten dashboards, each its own area; position-to-screen p99 | — |
 | R3 Zones and geofence events | M | Enter/exit/dwell; state rebuilt by replay | Zones light up; rebuild equals live | — |
+| R3b Public always-on demo | M | Hardened edge (TLS, short-lived tokens, read-only view, rate limits), small fleet on a cheap cluster, cost metered | Public URL live from a phone; cost panel shows spend | — |
 | R4a Orders and single-writer dispatch | L | Outbox, reservation + pinning + fencing, nearest-available, auto-accept | Orders assigned live; zero double assignment under burst, restart, border test | — |
 | **v0.4 cut** | — | First showable system | README numbers; 60 s clip | — |
 | R4b Offer protocol | L | Offers with expiry, accept/decline, heartbeat loss | Declines and timeouts live; late accept rejected | — |
@@ -23,6 +24,6 @@ in its file is ticked and the tag exists. One slice is `open` at a time.
 | R9 Failure proof | M | Fault-injection scenarios with invariant checks | Kill node and zone; map keeps moving | — |
 | R10 v1.0 | S | Design write-up, ADRs, runbook, video | Tagged release | — |
 
-Full plan with goals, invariants, decisions, event catalog and evidence plan:
-`../design/README.md` (grows per release). Source plan kept in the owner's
-ideas vault.
+Full product plan (goals, invariants, fourteen decisions, event catalog, evidence
+plan): `../product/PLAN.md`. The design write-up `../design/README.md` grows per
+release and is complete at v1.0.

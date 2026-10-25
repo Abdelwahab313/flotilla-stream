@@ -5,10 +5,11 @@ evidence, not features. Every claim in `README.md` is backed by a test in this
 repo that anyone can rerun.
 
 ## Where the truth is
-- `docs/releases/README.md` — the release plan (R0–R10) with sizes and order.
+- `docs/product/PLAN.md` — the product plan: goals, invariants, fourteen decisions, event catalog, evidence plan.
+- `docs/releases/README.md` — the release plan (R0–R10, fourteen slices) with sizes and order.
 - `docs/releases/Rn.md` — the **open slice**: In/Out, exit-criteria checklist,
   decision records due, demo script, numbers required. Only one is `open` at a time.
-- `docs/decisions/` — ADRs 0001–0013, numbered as the design decisions. Written
+- `docs/decisions/` — ADRs 0001–0014, numbered as the design decisions. Written
   in the release that introduces them.
 - `docs/results/` — measured numbers per release with the exact command that produced them.
 
@@ -36,6 +37,15 @@ repo that anyone can rerun.
    If a slice cannot close, write the blocker in `docs/releases/Rn.md` — never
    open the next one.
 10. **Comments**: none by default. Only for a non-obvious why.
+
+## Agents and skills in `.claude/`
+- `/open-slice` → creates `docs/releases/Rn.md` from the plan; `/close-slice` → gatekeeper audit, promote numbers, tag; `/record-decision` → fill an ADR and have it critiqued.
+- `slice-planner` — sitting plan for the open slice (read-only).
+- `release-gatekeeper` — can the slice close? Evidence-based pass/fail (read-only, runs demos).
+- `invariant-auditor` — correctness review of any diff under `services/`, `checker/`, `simulator/`.
+- `bench-runner` — runs scenarios, derives every number twice, writes `docs/results/Rn.md`.
+- `platform-engineer` — `deploy/` and `infra/` work, time-boxed to one sitting per tooling problem.
+- `design-critic` — adversarial review of ADRs and L-sized slice plans.
 
 ## Commands (fill in as they exist)
 - `make demo-r0` — clean checkout to moving dot.
