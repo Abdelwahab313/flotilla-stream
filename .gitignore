@@ -1,0 +1,30 @@
+# Go
+bin/
+dist/
+*.test
+*.out
+coverage.*
+vendor/
+
+# Local tooling
+.env
+.env.*
+!.env.example
+*.kubeconfig
+kubeconfig*
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.example.tfvars
+.terraform.lock.hcl
+
+# Data and results scratch
+simulator/data/*.pbf
+docs/results/**/raw/
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
