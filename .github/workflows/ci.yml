@@ -35,12 +35,12 @@ jobs:
         env:
           REDIS_ADDR: localhost:6379
         run: |
-          comm -13 <(go test -list . ./... | grep '^Test' | sort) \
-                   <(go test -tags integration -list . ./... | grep '^Test' | sort) > integration-tests.txt
+          list() { go test "$@" -list . ./... | awk '/^Test/ {t[n++] = $1} /^ok / {for (i = 0; i < n; i++) print $2 "." t[i]; n = 0}' | sort; }
+          comm -13 <(list) <(list -tags integration) > integration-tests.txt
           echo "integration tests: $(wc -l < integration-tests.txt)"
           [ -s integration-tests.txt ] || { echo "no integration tests compiled under -tags integration"; exit 1; }
           go test -race -count=1 -tags integration -json ./... > test.json || { jq -rj 'select(.Action=="output") | .Output' test.json; exit 1; }
-          passed=$(jq -r 'select(.Action=="pass" and .Test != null) | .Test' test.json | sort -u)
+          passed=$(jq -r 'select(.Action=="pass" and .Test != null) | .Package + "." + .Test' test.json | sort -u)
           missing=$(comm -23 integration-tests.txt <(echo "$passed"))
           [ -z "$missing" ] || { echo "integration tests that did not pass: $missing"; exit 1; }
           echo "passed tests: $(echo "$passed" | grep -c .)"

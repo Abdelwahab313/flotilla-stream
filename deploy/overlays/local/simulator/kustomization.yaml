@@ -3,5 +3,8 @@ kind: Kustomization
 
 namespace: flotilla
 
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "1"
+
 resources:
   - simulator.yaml

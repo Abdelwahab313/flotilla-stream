@@ -7,6 +7,7 @@ CTX=kind-flotilla
 GRAFANA=http://127.0.0.1:13000
 TEMPO="$GRAFANA/api/datasources/proxy/uid/tempo"
 RAW=docs/results/raw
+T0=$(date +%s)
 step() { printf '\n== [%4ss] %s\n' "$SECONDS" "$1"; }
 
 step "Building images, creating the kind cluster, applying deploy/overlays/local (Strimzi Kafka, Redis, Tempo, Grafana, four services)"
@@ -22,7 +23,8 @@ step "One trace spans simulator -> ingest -> log -> projector -> live gateway We
 query='{ resource.service.name = "simulator" } && { name = "live-gateway.ws_write" }'
 trace_id=""
 for _ in $(seq 1 30); do
-  trace_id=$(curl -fsS -G "$TEMPO/api/search" --data-urlencode "q=$query" --data-urlencode limit=1 |
+  trace_id=$(curl -fsS -G "$TEMPO/api/search" --data-urlencode "q=$query" --data-urlencode limit=1 \
+      --data-urlencode "start=$T0" --data-urlencode "end=$(( $(date +%s) + 1 ))" |
     python3 -c 'import json,sys; t=json.load(sys.stdin).get("traces") or []; print(t[0]["traceID"] if t else "")')
   [ -n "$trace_id" ] && break
   sleep 2

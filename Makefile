@@ -10,10 +10,12 @@ IMAGES   := simulator=simulator \
 OVERLAY  := deploy/overlays/.generated/local
 KUBECTL  := kubectl --context $(CONTEXT)
 REPO_URL := https://github.com/Abdelwahab313/flotilla-stream.git
-INPUTS   := go.mod go.sum cmd internal services simulator deploy infra Makefile
+INPUTS   := go.mod go.sum cmd internal services simulator deploy/images
+SYNCED   := $(INPUTS) deploy infra Makefile
 
 SHORT := $(shell git rev-parse HEAD | cut -c1-7)
 DIRTY := $(shell git status --porcelain -- $(INPUTS) | head -1)
+UNSYNCED := $(shell git status --porcelain -- $(SYNCED) | head -1)
 ifneq ($(DIRTY),)
 DIFFHASH := $(shell { git diff HEAD --binary -- $(INPUTS); git ls-files -o --exclude-standard -z -- $(INPUTS) | xargs -0 shasum -a 256 2>/dev/null; } | shasum -a 256 | cut -c1-8)
 TAG := sha-$(SHORT)-dirty-$(DIFFHASH)
@@ -32,7 +34,8 @@ tag:
 up-local: preflight images kind-up kind-load deploy-local
 
 preflight:
-	@for t in docker kind kubectl go git openssl; do command -v $$t >/dev/null || { echo "missing tool: $$t"; exit 1; }; done
+	@for t in docker kind kubectl helm go git openssl shasum nc curl python3; do command -v $$t >/dev/null || { echo "missing tool: $$t"; exit 1; }; done
+	@case "$$(helm version --short)" in v4.*) ;; *) echo "helm 4 is needed (kubectl kustomize --enable-helm), found $$(helm version --short)"; exit 1;; esac
 	@if [ -n "$$(docker compose -p flotilla ps -q 2>/dev/null)" ]; then echo "the compose stack is running; stop it first (docker compose down): both do not fit in memory"; exit 1; fi
 	@mem=$$(docker info --format '{{.MemTotal}}'); if [ $$mem -lt 7000000000 ]; then echo "docker has $$mem bytes of memory; 7 GB or more is needed"; exit 1; fi
 	@if ! kind get clusters 2>/dev/null | grep -qx $(CLUSTER); then \
@@ -72,7 +75,7 @@ kind-down:
 	kind delete cluster --name $(CLUSTER)
 
 gitops-preflight:
-	@if [ -n "$(DIRTY)" ]; then echo "uncommitted changes under $(INPUTS); Argo CD syncs a pushed commit only"; exit 1; fi
+	@if [ -n "$(UNSYNCED)" ]; then echo "uncommitted changes under $(SYNCED); Argo CD syncs a pushed commit only"; exit 1; fi
 	@git fetch --quiet origin
 	@if [ -z "$$(git branch -r --contains HEAD)" ]; then echo "HEAD $(SHORT) is not on any branch of origin; push it first"; exit 1; fi
 
@@ -92,6 +95,7 @@ gitops-local: gitops-preflight preflight images kind-up kind-load
 	   echo "    kustomize:"; echo "      images:"; \
 	   for e in $(IMAGES); do echo "        - $(REGISTRY)/$${e%%=*}:$(TAG)"; done; \
 	   echo "  syncPolicy:"; echo "    automated: {prune: true, selfHeal: true}"; \
+	   echo "    retry: {limit: 5, backoff: {duration: 10s, factor: 2, maxDuration: 3m}}"; \
 	   echo "    syncOptions: [ServerSideApply=true, SkipDryRunOnMissingResource=true]"; \
 	} | $(KUBECTL) apply --server-side -f -
 	$(KUBECTL) wait application/flotilla-local -n argocd --for=jsonpath='{.status.sync.status}'=Synced --timeout=900s
