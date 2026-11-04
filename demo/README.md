@@ -20,3 +20,22 @@ about to show, runs it, and ends with the checker.
 | `r9.sh` | Kill node and zone under load; recovery table | todo |
 
 Video links are added at v0.5 and v1.0.
+
+## R0 without Kubernetes (sitting 1)
+
+```sh
+docker compose up -d --wait
+go build -o bin/ ./simulator ./services/ingest-gateway ./services/location-projector ./services/live-gateway
+bin/ingest-gateway & bin/location-projector & bin/live-gateway &
+bin/simulator
+```
+
+| What | Where |
+| --- | --- |
+| Map | http://127.0.0.1:8080/ |
+| Traces (Grafana, Explore → Tempo) | http://127.0.0.1:3000/explore |
+| Tempo API | http://127.0.0.1:3200/api/search?q=%7Bresource.service.name%3D%22live-gateway%22%7D |
+| Ingest | `POST http://127.0.0.1:8081/v1/positions`, `Authorization: Bearer dev-token` |
+
+Tests: `go test -race ./...`; against the compose Redis: `go test -race -tags integration ./services/location-projector/...`.
+Stop: `docker compose down`.
