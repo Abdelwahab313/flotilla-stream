@@ -78,7 +78,8 @@ that the split is right under load; the first load figure is R1's.
     Inside it, mean per call: `hget` 15.9, `geoadd` 32.1, `hset` 13.9, `publish` 15.3 µs.
     These sum to 77.3 µs; the remaining 155 µs is script execution overhead.
   - Application side: `projector.apply` span, n = 120: mean 1.18 ms, p50 0.96 ms, p90
-    1.84 ms, p99 8.35 ms, max 9.39 ms.
+    1.84 ms, p99 8.35 ms, max 9.39 ms. Percentiles are sample `⌊q·n⌋` of the sorted
+    durations; the interpolated median is 0.950 ms (`docs/results/R0.md` §6).
   - Counts agree: 121 against 120, one record at the window edge.
   - Means compared: 0.23 ms in Redis against 1.18 ms in the client. The difference is
     the pod-to-pod hop through the `redis` Service, plus client work:
