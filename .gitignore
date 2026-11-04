@@ -21,6 +21,9 @@ kubeconfig*
 deploy/**/charts/
 deploy/overlays/.generated/
 
+# Design assets kept locally, out of the repo
+mockups/
+
 # Data and results scratch
 simulator/data/*.pbf
 docs/results/**/raw/

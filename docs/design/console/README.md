@@ -12,7 +12,8 @@ Source: the R2 design revision, six desktop bundles in `mockups/bundles-2026-11-
 with its components (`TopBar.dc.html`, `NavRail.dc.html`, `Basemap.dc.html`) beside it;
 read those rather than the bundles, which are gzip+base64 inside a JSON manifest. Serve
 `mockups/boards/` over HTTP to render a board. The first revision (2026-10-25), including
-the O7 phone boards, is in `mockups/archive/`.
+the O7 phone boards, is in `mockups/archive/`. `mockups/` is a local asset folder, not
+tracked in this repo.
 
 ## Boards
 
