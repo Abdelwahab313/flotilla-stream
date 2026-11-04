@@ -5,7 +5,7 @@ about to show, runs it, and ends with the checker.
 
 | Script | Shows | Status |
 | --- | --- | --- |
-| `r0.sh` | One command → dot moves on the map → trace link | todo |
+| `R0.sh` | One command → dot moves on the map → trace link | `make demo-r0` |
 | `r1.sh` | 1,000 drivers; ingest rate, lag, latency board | todo |
 | `r2.sh` | Ten dashboards, each its own area; kill a gateway replica | todo |
 | `r3.sh` | Zones light up; rebuild from log equals live | todo |
@@ -20,6 +20,21 @@ about to show, runs it, and ends with the checker.
 | `r9.sh` | Kill node and zone under load; recovery table | todo |
 
 Video links are added at v0.5 and v1.0.
+
+## R0 on kind
+
+Needs docker (7 GB or more of memory), kind, kubectl, go, git and network access.
+
+```sh
+make demo-r0     # build images, create kind cluster "flotilla", apply deploy/overlays/local, assert dot and trace
+make kind-down   # delete the cluster
+```
+
+| What | Where |
+| --- | --- |
+| Map | http://127.0.0.1:18080/ |
+| Traces (Grafana, Explore → Tempo) | http://127.0.0.1:13000/explore |
+| Evidence | `docs/results/raw/R0-trace-<id>.json`, `docs/results/raw/R0-pods.json` |
 
 ## R0 without Kubernetes (sitting 1)
 

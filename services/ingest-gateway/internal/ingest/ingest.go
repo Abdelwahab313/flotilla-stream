@@ -20,10 +20,15 @@ type Producer interface {
 	Produce(ctx context.Context, r position.Reported) error
 }
 
+// DefaultProduceTimeout is shorter than a device's request timeout, so the 503
+// and Retry-After reach a client that is still waiting.
+const DefaultProduceTimeout = 3 * time.Second
+
 type Handler struct {
-	Token    string
-	Producer Producer
-	Now      func() time.Time
+	Token          string
+	Producer       Producer
+	Now            func() time.Time
+	ProduceTimeout time.Duration
 }
 
 type report struct {
@@ -58,7 +63,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ev.IngestTime = h.Now().UTC()
-	if err := h.Producer.Produce(r.Context(), ev); err != nil {
+	timeout := h.ProduceTimeout
+	if timeout <= 0 {
+		timeout = DefaultProduceTimeout
+	}
+	pctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+	if err := h.Producer.Produce(pctx, ev); err != nil {
 		slog.ErrorContext(r.Context(), "produce failed", "driver_id", ev.DriverID, "err", err)
 		w.Header().Set("Retry-After", "1")
 		http.Error(w, "log unavailable", http.StatusServiceUnavailable)

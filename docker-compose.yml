@@ -2,7 +2,7 @@ name: flotilla
 
 services:
   kafka:
-    image: apache/kafka:4.4.0
+    image: apache/kafka:4.3.2
     ports:
       - "127.0.0.1:9092:9092"
     environment:
@@ -27,7 +27,7 @@ services:
       start_period: 10s
 
   kafka-topics:
-    image: apache/kafka:4.4.0
+    image: apache/kafka:4.3.2
     depends_on:
       kafka:
         condition: service_healthy

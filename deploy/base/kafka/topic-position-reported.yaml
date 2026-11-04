@@ -1,0 +1,12 @@
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: position-reported
+  labels:
+    strimzi.io/cluster: flotilla
+spec:
+  topicName: position.reported
+  partitions: 6
+  replicas: 1
+  config:
+    retention.ms: 259200000

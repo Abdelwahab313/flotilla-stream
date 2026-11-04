@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simulator
+  labels:
+    app.kubernetes.io/name: simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: simulator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: simulator
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: simulator
+          image: ghcr.io/abdelwahab313/flotilla-stream/simulator
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: INGEST_URL
+              value: http://ingest-gateway.flotilla.svc:8081/v1/positions
+            - name: INGEST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ingest-token
+                  key: token
+            - name: FLEET_ID
+              value: fleet-demo
+            - name: DRIVER_ID
+              value: D-118
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://tempo.observability.svc:4317
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

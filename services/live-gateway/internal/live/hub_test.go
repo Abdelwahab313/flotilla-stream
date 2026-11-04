@@ -122,3 +122,37 @@ func TestShutdownSendsGoingAwayAndWaitReturns(t *testing.T) {
 		t.Fatalf("Wait: %v", err)
 	}
 }
+
+func TestShutdownWithQueuedMessagesSendsGoingAway(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	base, stop := context.WithCancel(context.Background())
+	h := &Hub{Tracer: noop.NewTracerProvider().Tracer("test")}
+	srv := httptest.NewUnstartedServer(h)
+	srv.Config.BaseContext = func(net.Listener) context.Context { return base }
+	srv.Start()
+	defer srv.Close()
+
+	c := dial(t, ctx, srv)
+	waitClients(t, h, 1)
+	closed := make(chan error, 1)
+	go func() {
+		for {
+			if _, _, err := c.Read(ctx); err != nil {
+				closed <- err
+				return
+			}
+		}
+	}()
+	for range 8 {
+		h.Broadcast(ctx, []byte(`{"driver_id":"D-1","seq":1,"lat":0,"lon":0}`))
+	}
+	stop()
+	err := <-closed
+	if got := websocket.CloseStatus(err); got != websocket.StatusGoingAway {
+		t.Fatalf("close status = %v (err %v), want StatusGoingAway", got, err)
+	}
+	if err := h.Wait(ctx); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+}

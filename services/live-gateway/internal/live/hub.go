@@ -109,8 +109,15 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ping := time.NewTicker(pingInterval)
 	defer ping.Stop()
+	// Writes and pings outlive shutdown by at most writeTimeout so the loop gets
+	// back here to send GoingAway; on a cancelled context the library drops the
+	// connection without a close frame.
+	work := context.WithoutCancel(ctx)
 	for {
 		select {
+		case <-ctx.Done():
+			_ = conn.Close(websocket.StatusGoingAway, "")
+			return
 		case <-c.kicked:
 			_ = conn.Close(websocket.StatusPolicyViolation, "too slow")
 			return
@@ -126,12 +133,12 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_ = conn.Close(websocket.StatusPolicyViolation, "too slow")
 			return
 		case it := <-c.send:
-			if err := h.write(ctx, conn, it); err != nil {
+			if err := h.write(work, conn, it); err != nil {
 				slog.Debug("socket write failed", "err", err)
 				return
 			}
 		case <-ping.C:
-			pctx, cancel := context.WithTimeout(ctx, writeTimeout)
+			pctx, cancel := context.WithTimeout(work, writeTimeout)
 			err := conn.Ping(pctx)
 			cancel()
 			if err != nil {

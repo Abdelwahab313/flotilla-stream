@@ -158,3 +158,22 @@ func FuzzHandler(f *testing.F) {
 		}
 	})
 }
+
+type blockedProducer struct{}
+
+func (blockedProducer) Produce(ctx context.Context, _ position.Reported) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestHandlerAnswersWithinProduceTimeout(t *testing.T) {
+	h := &Handler{Token: "test-token", Producer: blockedProducer{}, Now: func() time.Time { return fixedNow }, ProduceTimeout: 100 * time.Millisecond}
+	start := time.Now()
+	rec := post(h, "Bearer test-token", `{"fleet_id":"f","driver_id":"d","seq":1,"device_ts":"2026-11-04T12:00:00Z","lat":1,"lon":1}`)
+	if d := time.Since(start); d > time.Second {
+		t.Fatalf("answered after %v with a 100 ms produce timeout", d)
+	}
+	if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") == "" {
+		t.Fatalf("status = %d retry-after = %q, want 503 with Retry-After", rec.Code, rec.Header().Get("Retry-After"))
+	}
+}

@@ -56,7 +56,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = shutdownTracing(context.Background()) }()
+	defer shutdownTracing()
 
 	url := getenv("INGEST_URL", "http://127.0.0.1:8081/v1/positions")
 	token := getenv("INGEST_TOKEN", "dev-token")

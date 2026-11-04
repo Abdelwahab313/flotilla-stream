@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: location-projector
+  labels:
+    app.kubernetes.io/name: location-projector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: location-projector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: location-projector
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: location-projector
+          image: ghcr.io/abdelwahab313/flotilla-stream/location-projector
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PROJECTOR_ADDR
+              value: ":8082"
+            - name: KAFKA_BROKERS
+              value: flotilla-kafka-bootstrap.flotilla.svc:9092
+            - name: REDIS_ADDR
+              value: redis.flotilla.svc:6379
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://tempo.observability.svc:4317
+          ports:
+            - name: http
+              containerPort: 8082
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

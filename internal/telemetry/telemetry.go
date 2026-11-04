@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.opentelemetry.io/otel"
@@ -17,7 +18,9 @@ import (
 
 // Setup installs a JSON slog default logger, the W3C propagator and an OTLP/gRPC
 // tracer provider (endpoint from OTEL_EXPORTER_OTLP_ENDPOINT, default localhost:4317).
-func Setup(ctx context.Context, service string) (func(context.Context) error, error) {
+// The returned shutdown flushes spans for at most shutdownTimeout: with the
+// collector down, an unbounded flush retries exports and blocks process exit.
+func Setup(ctx context.Context, service string) (func(), error) {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)).With("service", service))
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
@@ -31,8 +34,16 @@ func Setup(ctx context.Context, service string) (func(context.Context) error, er
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exp), sdktrace.WithResource(res))
 	otel.SetTracerProvider(tp)
-	return tp.Shutdown, nil
+	return func() {
+		sctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := tp.Shutdown(sctx); err != nil {
+			slog.Warn("trace flush incomplete at shutdown", "err", err)
+		}
+	}, nil
 }
+
+const shutdownTimeout = 5 * time.Second
 
 // RecordCarrier carries trace context in Kafka record headers.
 type RecordCarrier struct{ R *kgo.Record }

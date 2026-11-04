@@ -1,0 +1,95 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io/abdelwahab313/flotilla-stream
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      redis:
+        image: redis:8.10.3-alpine@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 2s --health-retries 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - name: go test -race, unit and integration
+        env:
+          REDIS_ADDR: localhost:6379
+        run: |
+          comm -13 <(go test -list . ./... | grep '^Test' | sort) \
+                   <(go test -tags integration -list . ./... | grep '^Test' | sort) > integration-tests.txt
+          echo "integration tests: $(wc -l < integration-tests.txt)"
+          [ -s integration-tests.txt ] || { echo "no integration tests compiled under -tags integration"; exit 1; }
+          go test -race -count=1 -tags integration -json ./... > test.json || { jq -rj 'select(.Action=="output") | .Output' test.json; exit 1; }
+          passed=$(jq -r 'select(.Action=="pass" and .Test != null) | .Test' test.json | sort -u)
+          missing=$(comm -23 integration-tests.txt <(echo "$passed"))
+          [ -z "$missing" ] || { echo "integration tests that did not pass: $missing"; exit 1; }
+          echo "passed tests: $(echo "$passed" | grep -c .)"
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+      - name: render deploy/overlays/local
+        run: |
+          kubectl version --client
+          kubectl kustomize --enable-helm deploy/overlays/local > /dev/null
+
+  images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: simulator
+            dir: simulator
+          - name: ingest-gateway
+            dir: services/ingest-gateway
+          - name: location-projector
+            dir: services/location-projector
+          - name: live-gateway
+            dir: services/live-gateway
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: tag
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/images/Dockerfile
+          build-args: SERVICE=${{ matrix.dir }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.name }}:sha-${{ steps.tag.outputs.short }}
+            ${{ env.REGISTRY }}/${{ matrix.name }}:main
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

@@ -9,6 +9,7 @@ require (
 	github.com/twmb/franz-go v1.22.2
 	github.com/twmb/franz-go/pkg/kadm v1.19.0
 	github.com/twmb/franz-go/pkg/kfake v0.0.0-20261022190701-123ec885bc97
+	github.com/twmb/franz-go/pkg/kmsg v1.15.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.47.0
@@ -27,7 +28,6 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.15.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0 // indirect

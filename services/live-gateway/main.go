@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -18,12 +17,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/Abdelwahab313/flotilla-stream/internal/position"
+	"github.com/Abdelwahab313/flotilla-stream/internal/health"
 	"github.com/Abdelwahab313/flotilla-stream/internal/telemetry"
 	"github.com/Abdelwahab313/flotilla-stream/services/live-gateway/internal/live"
 )
@@ -32,13 +28,6 @@ const service = "live-gateway"
 
 //go:embed web
 var webFS embed.FS
-
-type message struct {
-	DriverID string  `json:"driver_id"`
-	Seq      int64   `json:"seq"`
-	Lat      float64 `json:"lat"`
-	Lon      float64 `json:"lon"`
-}
 
 func main() {
 	if err := run(); err != nil {
@@ -55,9 +44,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = shutdownTracing(context.Background()) }()
+	defer shutdownTracing()
 
 	addr := getenv("LIVE_ADDR", "127.0.0.1:8080")
+	drainDelay, err := time.ParseDuration(getenv("SHUTDOWN_DRAIN_DELAY", "5s"))
+	if err != nil || drainDelay < 0 {
+		return fmt.Errorf("SHUTDOWN_DRAIN_DELAY: want a duration like 5s, got %q", os.Getenv("SHUTDOWN_DRAIN_DELAY"))
+	}
 	rdb := redis.NewClient(&redis.Options{Addr: getenv("REDIS_ADDR", "localhost:6379")})
 	defer rdb.Close()
 
@@ -67,31 +60,29 @@ func run() error {
 	}
 	tracer := otel.Tracer(service)
 	hub := &live.Hub{Tracer: tracer}
+	sub := &live.Subscriber{RDB: rdb, Hub: hub, Tracer: tracer, Backoff: health.Default, Idle: 15 * time.Second}
+	ready := &health.Readiness{Probes: []health.Probe{{Name: "redis subscription", Check: sub.Ready}}}
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /", http.FileServerFS(noListing{web}))
 	mux.Handle("GET /ws", hub)
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		pctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-		if err := rdb.Ping(pctx).Err(); err != nil {
-			http.Error(w, "redis unreachable", http.StatusServiceUnavailable)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	})
+	mux.HandleFunc("GET /healthz", health.Live)
+	mux.Handle("GET /readyz", ready)
 
+	// Sockets and the subscription keep serving through the drain delay, so
+	// clients keep moving dots until the endpoint is gone; then sockets get
+	// GoingAway. Sockets are hijacked, so Shutdown does not reach them.
+	serveCtx, stopServing := context.WithCancel(context.Background())
+	defer stopServing()
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
-		// Sockets are hijacked, so Shutdown does not reach them; they end with ctx.
-		BaseContext: func(net.Listener) context.Context { return ctx },
+		BaseContext:       func(net.Listener) context.Context { return serveCtx },
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
-	g.Go(func() error { return subscribe(gctx, rdb, hub, tracer) })
+	g.Go(func() error { return sub.Run(serveCtx) })
 	g.Go(func() error {
 		slog.Info("listening", "addr", addr)
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
@@ -101,6 +92,10 @@ func run() error {
 	})
 	g.Go(func() error {
 		<-gctx.Done()
+		ready.Drain()
+		slog.Info("draining", "delay", drainDelay.String())
+		time.Sleep(drainDelay)
+		stopServing()
 		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		err := srv.Shutdown(sctx)
@@ -133,40 +128,6 @@ func (n noListing) Open(name string) (fs.File, error) {
 		}
 	}
 	return f, nil
-}
-
-func subscribe(ctx context.Context, rdb *redis.Client, hub *live.Hub, tracer trace.Tracer) error {
-	ps := rdb.PSubscribe(ctx, position.UpdatesPattern)
-	defer ps.Close()
-	if _, err := ps.Receive(ctx); err != nil {
-		return fmt.Errorf("psubscribe %s: %w", position.UpdatesPattern, err)
-	}
-	slog.Info("subscribed", "pattern", position.UpdatesPattern)
-	ch := ps.Channel()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case m, ok := <-ch:
-			if !ok {
-				return nil
-			}
-			var u position.Update
-			if err := json.Unmarshal([]byte(m.Payload), &u); err != nil {
-				slog.Warn("skipping undecodable update", "channel", m.Channel, "err", err)
-				continue
-			}
-			msg, err := json.Marshal(message{DriverID: u.DriverID, Seq: u.Seq, Lat: u.Lat, Lon: u.Lon})
-			if err != nil {
-				continue
-			}
-			uctx := otel.GetTextMapPropagator().Extract(ctx, propagation.MapCarrier(u.Trace))
-			uctx, span := tracer.Start(uctx, "live-gateway.broadcast", trace.WithSpanKind(trace.SpanKindConsumer),
-				trace.WithAttributes(attribute.String("driver.id", u.DriverID), attribute.Int64("position.seq", u.Seq), attribute.Int("live.clients", hub.Clients())))
-			hub.Broadcast(uctx, msg)
-			span.End()
-		}
-	}
 }
 
 func getenv(key, def string) string {

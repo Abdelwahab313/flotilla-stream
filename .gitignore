@@ -18,6 +18,8 @@ kubeconfig*
 *.tfvars
 !*.example.tfvars
 .terraform.lock.hcl
+deploy/**/charts/
+deploy/overlays/.generated/
 
 # Data and results scratch
 simulator/data/*.pbf

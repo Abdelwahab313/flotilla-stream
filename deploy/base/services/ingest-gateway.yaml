@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingest-gateway
+  labels:
+    app.kubernetes.io/name: ingest-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingest-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ingest-gateway
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ingest-gateway
+          image: ghcr.io/abdelwahab313/flotilla-stream/ingest-gateway
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: INGEST_ADDR
+              value: ":8081"
+            - name: KAFKA_BROKERS
+              value: flotilla-kafka-bootstrap.flotilla.svc:9092
+            - name: INGEST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ingest-token
+                  key: token
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://tempo.observability.svc:4317
+          ports:
+            - name: http
+              containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingest-gateway
+  labels:
+    app.kubernetes.io/name: ingest-gateway
+spec:
+  selector:
+    app.kubernetes.io/name: ingest-gateway
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
