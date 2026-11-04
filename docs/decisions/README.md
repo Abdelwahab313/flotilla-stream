@@ -18,3 +18,6 @@ Numbered as the design decisions. One page each: Context · Options · Decision 
 | 0012 | [Failure domains](0012-failure-domains.md) | R6a, R6b | proposed |
 | 0013 | [Driver-side exclusivity and owner fencing](0013-driver-exclusivity-and-owner-fencing.md) | R4a | proposed |
 | 0014 | [Cost as a measured, pluggable signal](0014-cost-as-measured-signal.md) | R3b, R8 | proposed |
+| 0015 | [Tenancy model](0015-tenancy-model.md) | R3b | proposed |
+| 0016 | [Planner placement and batching scope](0016-planner-placement-and-batching-scope.md) | R4a | proposed |
+| 0017 | [Console frontend stack](0017-console-frontend-stack.md) | R2 | proposed |

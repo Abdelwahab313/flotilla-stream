@@ -1,0 +1,134 @@
+/* Flotilla Console design tokens, by role (CONSOLE-PRD §12.2). Revision R2 (2026-11-03).
+   Source: mockups/boards/R2-tokens-and-contrast/index.html; every ratio re-derived (README § Contrast).
+   .t-bridge = Cargo (dark, dispatcher default). .t-chart = Ops Grey (light, public view).
+   Components read roles only; a raw hex outside this file is a review finding. */
+
+.t-bridge {
+  color-scheme: dark;
+  --ground: #141415;
+  --surface: #1B1B1D;
+  --raised: #232326;
+  --overlay: #27272A;
+  --line: #2B2B2F;
+  --line-strong: #3B3B40;
+  --ink: #F5F5F6;
+  --ink-2: #A8A8AE;
+  --ink-3: #8B8B92;
+  --accent: #6461F2;              /* fills, rings, focus; never body text */
+  --accent-text: #797DFF;
+  --accent-ink: #FFFFFF;
+  --accent-soft: rgba(100, 97, 242, 0.16);
+  --positive: #22C55E;
+  --attention: #F7B82B;
+  --active: #4188FD;
+  --neutral: #8C8C93;
+  --restricted: #C98AE6;
+  --critical: #F94E4C;
+  --critical-ink: #141415;
+  --info: #8B8CFB;
+  --positive-soft: rgba(34, 197, 94, 0.14);
+  --attention-soft: rgba(247, 184, 43, 0.14);
+  --active-soft: rgba(65, 136, 253, 0.16);
+  --critical-soft: rgba(249, 78, 76, 0.15);
+  --restricted-soft: rgba(201, 138, 230, 0.14);
+  --neutral-soft: rgba(140, 140, 147, 0.15);
+  --map-land: #222224;
+  --map-land-2: #28282B;
+  --map-water: #1B1E23;
+  --map-road: #333337;
+  --map-road-major: #45454B;
+  --map-label: #8E8E95;
+  --depth: #A8A8AE;
+  --zone-1: 5%;                   /* zone fill steps: depth mixed into map-land-2 */
+  --zone-2: 9%;
+  --zone-3: 13%;
+  --zone-4: 18%;                  /* cap: every glyph keeps 3:1 on the busiest zone */
+  --zone-line: rgba(255, 255, 255, 0.10);
+  --route: #9A8CF8;
+  --halo: #9A8CF8;
+  --stale-fill: 0.35;
+  --scrim: rgba(10, 10, 11, 0.64);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 10px 30px rgba(0, 0, 0, 0.45);
+  --hazard: #F7B82B;
+}
+
+/* The nested selector lets an Ops Grey subtree win over a child that falls back to Cargo. */
+.t-chart, .t-chart .t-bridge {
+  color-scheme: light;
+  --ground: #DADAD6;
+  --surface: #E5E5E2;
+  --raised: #EFEFED;
+  --overlay: #F4F4F2;
+  --line: #C9C9C4;
+  --line-strong: #A9A9A4;
+  --ink: #1D1D1D;
+  --ink-2: #424240;
+  --ink-3: #5A5A57;
+  --accent: #4A47D6;
+  --accent-text: #4A47D6;
+  --accent-ink: #FFFFFF;
+  --accent-soft: rgba(74, 71, 214, 0.12);
+  --positive: #2B6A40;
+  --attention: #7E5701;
+  --active: #3A3A38;
+  --neutral: #5E5E59;
+  --restricted: #61488A;
+  --critical: #BD0F18;
+  --critical-ink: #FFFFFF;
+  --info: #4A47D6;
+  --positive-soft: rgba(43, 106, 64, 0.12);
+  --attention-soft: rgba(214, 150, 0, 0.18);
+  --active-soft: rgba(58, 58, 56, 0.09);
+  --critical-soft: rgba(189, 15, 24, 0.11);
+  --restricted-soft: rgba(97, 72, 138, 0.11);
+  --neutral-soft: rgba(94, 94, 89, 0.13);
+  --map-land: #CDCDC9;
+  --map-land-2: #D8D8D4;
+  --map-water: #B6C0C9;
+  --map-road: #C6C6C1;
+  --map-road-major: #B2B2AD;
+  --map-label: #555553;
+  --depth: #4A47D6;
+  --zone-1: 7%;
+  --zone-2: 13%;
+  --zone-3: 19%;
+  --zone-4: 26%;
+  --zone-line: rgba(29, 29, 29, 0.20);
+  --route: #4A47D6;
+  --halo: #4A47D6;
+  --stale-fill: 0.35;
+  --scrim: rgba(218, 218, 214, 0.72);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+  --hazard: #D69600;
+}
+
+:root {
+  --font-ui: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --radius-card: 18px;
+  --radius-pill: 10px;
+  --gap-card: 12px;
+  --topbar-h: 48px;
+  --navrail-w: 68px;
+  --context-w: 372px;
+  --context-w-narrow: 320px;
+  --toast-w: 352px;
+}
+
+/* Plus Jakarta Sans figures are proportional by default; live numbers must not shimmer. */
+.t-bridge, .t-chart {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes fl-ring { 0% { stroke-width: 1.5; stroke-opacity: 0.9; } 100% { stroke-width: 10; stroke-opacity: 0; } }
+@keyframes fl-shimmer { 0% { opacity: 0.55; } 50% { opacity: 1; } 100% { opacity: 0.55; } }
+@keyframes fl-spin { to { transform: rotate(360deg); } }
+.pulse-ring { animation: fl-ring 1.6s ease-out infinite; }
+.skeleton { animation: fl-shimmer 1.4s ease-in-out infinite; }
+.spin { animation: fl-spin 0.9s linear infinite; transform-origin: center; }
+.paused-stripes { background-image: repeating-linear-gradient(-45deg, var(--line-strong) 0 4px, transparent 4px 8px); }
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring { animation: none; stroke-opacity: 0; }
+  .skeleton, .spin { animation: none; }
+}

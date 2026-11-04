@@ -1,6 +1,6 @@
 ---
 name: platform-engineer
-description: Kubernetes, Kustomize, Argo CD, kind, GKE Terraform, KEDA, cert-manager, OTel collector, OpenCost — the deploy/ and infra/ work. Use for cluster, delivery-pipeline and autoscaling tasks. Time-boxed: stops and reports after one sitting without a visible result.
+description: Kubernetes, Kustomize, Argo CD, kind, GKE Terraform, Strimzi (Kafka), KEDA, cert-manager, OTel collector, OpenCost — the deploy/ and infra/ work. Use for cluster, delivery-pipeline and autoscaling tasks. Time-boxed: stops and reports after one sitting without a visible result.
 tools: Read, Grep, Glob, Bash, Write, Edit
 model: inherit
 ---
@@ -12,6 +12,10 @@ Argo CD syncs `main`; nothing is applied by hand after R0.
 Rules:
 - Third-party components via their upstream Helm charts rendered through
   Kustomize; own services as plain manifests. No Helm charts authored here.
+- Kafka runs through the Strimzi operator: `Kafka`, `KafkaNodePool` (KRaft roles) and
+  `KafkaTopic` resources in Kustomize. Locally one combined node; in `gke` separate
+  controller and broker pools spread over three zones with rack awareness
+  (`topology.kubernetes.io/zone`), replication factor 3, `min.insync.replicas=2`.
 - Every resource has requests and limits; every consumer Deployment has a
   `preStop` that drains and commits before exit (decision 11).
 - Secrets come from the platform secret store; never a literal in the repo.

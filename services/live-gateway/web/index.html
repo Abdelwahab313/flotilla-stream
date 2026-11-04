@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flotilla · Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="map.css">
+</head>
+<body class="t-bridge">
+<main class="shell">
+  <div id="map" class="map" aria-label="Live map"></div>
+
+  <div class="overlay overlay-top">
+    <div class="card status" role="status" aria-live="polite">
+      <span class="dot" id="conn-dot"></span>
+      <span id="conn-text">Connecting…</span>
+      <span class="mono muted" id="conn-detail"></span>
+    </div>
+    <div class="card chip mono" id="driver-chip" hidden></div>
+    <button class="pill mode" id="mode" type="button" aria-pressed="false">Ops Grey</button>
+  </div>
+
+  <div class="banner" id="paused" hidden>
+    <span class="spinner" aria-hidden="true"></span>
+    <strong>Live updates paused — reconnecting</strong>
+    <span class="muted">positions as of <span class="mono" id="paused-asof">—</span> · attempt <span class="mono" id="paused-attempt">1</span></span>
+    <button class="pill" id="retry" type="button">Retry now</button>
+  </div>
+
+  <div class="overlay overlay-bottom">
+    <div class="card legend">
+      <span class="legend-item"><span class="glyph glyph-available"></span>Available</span>
+      <span class="legend-item"><span class="glyph glyph-stale"></span>Stale (ring, faded)</span>
+    </div>
+  </div>
+</main>
+<script type="module" src="map.js"></script>
+</body>
+</html>
