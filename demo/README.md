@@ -23,7 +23,9 @@ Video links are added at v0.5 and v1.0.
 
 ## R0 on kind
 
-Needs docker (7 GB or more of memory), kind, kubectl, go, git and network access.
+Needs docker (7 GB or more of memory), kind, kubectl, helm 4, go, git, openssl, shasum, nc,
+curl, python3 and network access; ports 18080 and 13000 free; the compose stack down.
+`make preflight` checks these.
 
 ```sh
 make demo-r0     # build images, create kind cluster "flotilla", apply deploy/overlays/local, assert dot and trace

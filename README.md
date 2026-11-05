@@ -2,7 +2,7 @@
 
 flotilla-stream is a portfolio project: the real-time backbone of a delivery company, built by me to show how I would run one. Simulated drivers stream GPS positions. The system tracks each driver live, raises an event when a driver crosses a geofence, and assigns each order to the nearest available driver with no double assignment, including while a node or a whole zone is down. All traffic is synthetic. There is no real fleet behind it, and `simulator/` generates every driver, position and order you will see. Every number in this README will come from a test in this repo that you can rerun yourself.
 
-**Status:** R0 is open and nothing runs yet. No Go code exists, and `services/`, `deploy/` and `infra/` are empty. Every component and tool below has a status: `R0 (in progress)`, `planned, Rn` or `open, chosen in Rn`. The release plan is in [`docs/releases/`](docs/releases/). The decisions I have made so far, with the alternatives I rejected, are in [`docs/decisions/`](docs/decisions/).
+**Status:** R0 runs end to end on a local kind cluster, delivered by Argo CD. One simulated driver goes through the ingest gateway, Kafka, the location projector and Redis to a live map over WebSocket, and one trace spans all four services. R0 is still open; what stands between it and the `v0.0` tag is listed under Blockers in [`docs/releases/R0.md`](docs/releases/R0.md). Every component and tool below has a status: `R0 (in progress)`, `planned, Rn` or `open, chosen in Rn`. The release plan is in [`docs/releases/`](docs/releases/). The decisions I have made so far, with the alternatives I rejected, are in [`docs/decisions/`](docs/decisions/).
 
 ## Why this exists
 
@@ -112,7 +112,7 @@ flowchart LR
 
 1. The simulator sends `position.reported` with driver id, device sequence number and device timestamp. In R0 this is one driver posting over HTTP with a static token. From R1 the report is keyed by (device session, sequence) so a rebooted device is not frozen out (decision 4).
 2. The ingest gateway validates and normalizes the report and writes it to Kafka, keyed by driver id. From R1 it also drops duplicates by device sequence and sheds load with an explicit retry-after (decision 8).
-3. The location projector keeps the report only if it is newer than what is stored, and writes it to Redis (`HSET` plus `GEOADD`, fleet-prefixed keys). It emits `driver.connectivity_changed` (live, stale) from R2 and forwards the live position to the live gateway. The transport for that hop is open and gets chosen in R0.
+3. The location projector keeps the report only if it is newer than what is stored, and writes it to Redis (`HSET` plus `GEOADD`, fleet-prefixed keys). It emits `driver.connectivity_changed` (live, stale) from R2 and forwards the live position to the live gateway over Redis pub/sub, published by the same script that writes the position. Pub/sub can drop an update; the driver's next update replaces it.
 4. The zone processor emits `zone.entered`, `zone.exited` and `zone.dwell_exceeded` (R3).
 5. The history sink batches the report into the history store (R5).
 6. The live gateway pushes the update over WebSocket to the MapLibre page. In R0 every update goes to every page. From R2 each dashboard subscribes to map cells and gets at most one update per driver per interval (decision 9).
@@ -167,7 +167,7 @@ sequenceDiagram
   I->>L: produce to position.reported, key = driver id
   L->>P: consume
   P->>R: HSET if sequence is newer, GEOADD
-  P->>G: forward update (transport chosen in R0)
+  P->>G: forward update (Redis pub/sub)
   G->>M: WebSocket push
   Note over S,M: one OpenTelemetry trace spans every hop, viewed in Tempo
 ```
@@ -350,10 +350,10 @@ Only tools named in the repo's plan, slice files or agent definitions.
 | --- | --- | --- | --- |
 | Language | Go 1.27.1 | Services, simulator and checker | R0 (in progress) |
 | Language | TypeScript, with Node at build and dev time only | The console | planned, R2 |
-| Language | Go client libraries | Clients for Kafka, Redis, WebSocket and OpenTelemetry | open, chosen in R0 |
+| Language | Go client libraries: franz-go, go-redis v9, coder/websocket, OpenTelemetry Go | Clients for Kafka, Redis, WebSocket and OpenTelemetry | R0 (in progress) |
 | Messaging | Apache Kafka 4.x (KRaft) | The event log | R0 (in progress) |
 | Cluster and delivery | Strimzi | Runs Kafka on kind and GKE | R0 (in progress) |
-| Messaging | Projector-to-gateway transport | Carries live positions from the location projector to the live gateway | open, chosen in R0 |
+| Messaging | Redis pub/sub | Carries live positions from the location projector to the live gateway | R0 (in progress) |
 | Messaging | Device channel for `offer.sent` | Delivers offers to the simulated device | open, chosen in R4b |
 | Storage | Redis | Latest position, geo index, dispatch reservations | R0 (in progress); reservations planned, R4a |
 | Storage | Postgres | Order store and transactional outbox; the ops view's read model in its own database | planned, R4a; ops view R4d |
@@ -372,7 +372,7 @@ Only tools named in the repo's plan, slice files or agent definitions.
 | Cluster and delivery | cert-manager | TLS for the public demo | planned, R3b |
 | Cluster and delivery | KEDA | Lag-based autoscaling of consumers | planned, R6b |
 | Observability | OpenTelemetry | Trace context carried in every event | R0 (in progress) |
-| Observability | OTel collector | Receives and forwards telemetry. R0.md names only Tempo, so whether R0 goes through a collector is open | open, chosen in R0 |
+| Observability | OTel collector | Receives and forwards telemetry. Not in R0: services export OTLP straight to Tempo (`deploy/base/services/*.yaml`) | open, no slice assigned |
 | Observability | Tempo | Trace storage and viewing | R0 (in progress) |
 | Observability | Prometheus | Metrics, and one of the two sources `bench-runner` derives numbers from | planned, R1 |
 | Observability | Metrics dashboard tool | Golden-signals and SLO boards | open, chosen in R1 |
@@ -439,7 +439,16 @@ The eighteen slices run in strict order, one open at a time. Sizes are relative 
 
 ## Run it locally
 
-Not yet. From R0, `make demo-r0` will take a clean checkout to a moving dot on the map on a local kind cluster in under 10 minutes, and the time gets recorded in `docs/results/R0.md`. I will list the prerequisites when R0 closes.
+`make demo-r0` takes a clean checkout to a moving dot on the map on a local kind cluster, then checks the trace in Tempo. Times and conditions are in [`docs/results/R0.md`](docs/results/R0.md).
+
+You need docker with 7 GB or more of memory, kind, kubectl, helm 4, go, git, openssl, shasum, nc, curl, python3, and network access. Ports 18080 and 13000 must be free, and the compose stack must be down. `make demo-r0` checks all of this first.
+
+```sh
+make demo-r0     # build images, create the kind cluster, apply deploy/overlays/local, check the dot and the trace
+make kind-down   # delete the cluster
+```
+
+The map is at http://127.0.0.1:18080/ and traces at http://127.0.0.1:13000/explore (Grafana, Tempo). More in [`demo/README.md`](demo/README.md).
 
 ## How this repo is worked
 
