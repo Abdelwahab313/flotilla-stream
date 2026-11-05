@@ -40,6 +40,10 @@ _Avoid_: State (that is the whole driver state)
 A place where a fleet operates, with its own timezone; a fleet has one or more cities.
 _Avoid_: Market, region, service area
 
+**District**:
+The part of a city the simulator drives in, with its own road network (Maadi, downtown Cairo); a simulator setting, not a dispatch boundary.
+_Avoid_: Zone (that is the dispatch polygon), map, region
+
 **Zone**:
 A named polygon inside one city that dispatch and geofencing work on.
 _Avoid_: Area, region, geofence (geofence is the mechanism, zone is the thing)

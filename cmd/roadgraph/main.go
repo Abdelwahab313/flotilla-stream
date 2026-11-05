@@ -1,6 +1,7 @@
-// Command roadgraph builds the simulator's directed road graph from one committed
+// Command roadgraph builds one district's directed road graph from its committed
 // Overpass query: drivable ways clipped to the query's bbox, split at intersections
 // with every shape node kept, reduced to the largest strongly connected component.
+// The graph file and the raw response are named after the query file.
 package main
 
 import (
@@ -21,10 +22,10 @@ import (
 )
 
 func main() {
-	query := flag.String("query", "cmd/roadgraph/cairo-downtown.overpassql", "Overpass QL file, the committed source")
+	query := flag.String("query", "", "Overpass QL file, the committed source (cmd/roadgraph/<name>.overpassql)")
 	in := flag.String("in", "", "raw Overpass JSON to read instead of fetching")
-	raw := flag.String("raw", "/tmp/flotilla-osm/cairo-downtown.json", "where a fetched raw response is saved (never committed)")
-	out := flag.String("out", "simulator/roadgraph/cairo-downtown.json.gz", "graph file to write")
+	raw := flag.String("raw", "", "where a fetched raw response is saved, never committed (default /tmp/flotilla-osm/<name>.json)")
+	out := flag.String("out", "", "graph file to write (default simulator/roadgraph/<name>.json.gz)")
 	endpoint := flag.String("endpoint", "https://overpass-api.de/api/interpreter", "Overpass API endpoint")
 	stats := flag.String("stats", "", "print the stats of this graph file and exit")
 	flag.Parse()
@@ -34,6 +35,16 @@ func main() {
 			fail(err)
 		}
 		return
+	}
+	if *query == "" {
+		fail(fmt.Errorf("-query is required"))
+	}
+	name := strings.TrimSuffix(filepath.Base(*query), ".overpassql")
+	if *raw == "" {
+		*raw = filepath.Join("/tmp/flotilla-osm", name+".json")
+	}
+	if *out == "" {
+		*out = filepath.Join("simulator/roadgraph", name+".json.gz")
 	}
 	if err := run(*query, *in, *raw, *out, *endpoint); err != nil {
 		fail(err)
@@ -158,6 +169,9 @@ func printStats(w io.Writer, path string) error {
 	fmt.Fprintf(w, "query_sha256    %s\n", s.QuerySHA256)
 	fmt.Fprintf(w, "bbox            S %g W %g N %g E %g\n", s.BBox.S, s.BBox.W, s.BBox.N, s.BBox.E)
 	fmt.Fprintf(w, "district        S %g W %g N %g E %g (%d nodes)\n", s.District.S, s.District.W, s.District.N, s.District.E, st.DistrictNodes)
+	if s.DistrictSource != "" {
+		fmt.Fprintf(w, "district from   %s\n", s.DistrictSource)
+	}
 	fmt.Fprintf(w, "ways            raw %d, matched %d, in bbox %d, one-way %d\n", b.WaysRaw, b.WaysMatched, b.WaysInBBox, b.OnewayWays)
 	fmt.Fprintf(w, "sccs            %d total, 1 kept, %d dropped\n", b.SCCs, b.SCCs-1)
 	fmt.Fprintf(w, "                kept     before SCC  dropped\n")

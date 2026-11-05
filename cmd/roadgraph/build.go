@@ -98,6 +98,7 @@ var (
 	bboxRe     = regexp.MustCompile(`way\(` + num + `,` + num + `,` + num + `,` + num + `\)`)
 	districtRe = regexp.MustCompile(`(?m)^//\s*district` + num + `,` + num + `,` + num + `,` + num + `$`)
 	dateRe     = regexp.MustCompile(`\[date:"([^"]+)"\]`)
+	sourceRe   = regexp.MustCompile(`(?m)^//\s*district-source\s+(.+?)\s*$`)
 )
 
 func parseBBoxes(query []byte) (bbox, district roadgraph.BBox, err error) {
@@ -167,17 +168,22 @@ func build(query, raw []byte, endpoint string) (*roadgraph.File, error) {
 	if resp.OSM3S.TimestampOSMBase < date {
 		return nil, fmt.Errorf("overpass osm_base %s is older than the query's date %s", resp.OSM3S.TimestampOSMBase, date)
 	}
+	var districtSource string
+	if m := sourceRe.FindSubmatch(query); m != nil {
+		districtSource = string(m[1])
+	}
 	sum := sha256.Sum256(query)
 	f := &roadgraph.File{
 		Format: roadgraph.FormatVersion,
 		Source: roadgraph.Source{
-			Endpoint:    endpoint,
-			QuerySHA256: hex.EncodeToString(sum[:]),
-			Query:       string(query),
-			BBox:        bbox,
-			District:    district,
-			OSMBase:     date,
-			License:     "© OpenStreetMap contributors, ODbL 1.0",
+			Endpoint:       endpoint,
+			QuerySHA256:    hex.EncodeToString(sum[:]),
+			Query:          string(query),
+			BBox:           bbox,
+			District:       district,
+			DistrictSource: districtSource,
+			OSMBase:        date,
+			License:        "© OpenStreetMap contributors, ODbL 1.0",
 		},
 	}
 

@@ -29,7 +29,7 @@ demo-r0:
 	demo/R0.sh
 
 roadgraph:
-	go run ./cmd/roadgraph -query cmd/roadgraph/cairo-downtown.overpassql -out simulator/roadgraph/cairo-downtown.json.gz
+	@set -e; for q in cmd/roadgraph/*.overpassql; do echo "roadgraph $$q"; go run ./cmd/roadgraph -query $$q; done
 
 tag:
 	@echo $(TAG)

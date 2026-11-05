@@ -1,26 +1,41 @@
-// Package roadgraph holds the directed road graph of the simulated district, built by
-// cmd/roadgraph from one committed Overpass query and embedded in the simulator.
+// Package roadgraph holds the directed road graphs of the simulated districts, each
+// built by cmd/roadgraph from one committed Overpass query and embedded in the simulator.
 // Road data © OpenStreetMap contributors, ODbL 1.0.
 package roadgraph
 
 import (
-	"bytes"
 	"compress/gzip"
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"math"
+	"slices"
 )
 
-// MaxFileBytes is the hard limit on the embedded, gzipped graph file.
-const MaxFileBytes = 512 << 10
+// MaxFileBytes is the hard limit on each embedded, gzipped graph file.
+const MaxFileBytes = 1 << 20
 
 // FormatVersion is the version of File written by cmd/roadgraph.
 const FormatVersion = 1
 
-//go:embed cairo-downtown.json.gz
-var cairoDowntown []byte
+// Default is the district a simulator run drives when none is chosen.
+const Default = "maadi"
+
+// files maps each district to its graph file, named after the query that built it.
+var files = map[string]string{
+	"downtown": "cairo-downtown.json.gz",
+	"maadi":    "maadi.json.gz",
+}
+
+//go:embed *.json.gz
+var embedded embed.FS
+
+// Districts lists the embedded districts by name, sorted.
+func Districts() []string {
+	return slices.Sorted(maps.Keys(files))
+}
 
 // File is the on-disk form: undirected segments carry a oneway flag (already
 // oriented along the direction of travel); Decode expands them to directed edges.
@@ -42,8 +57,10 @@ type Source struct {
 	Query       string `json:"query"`
 	BBox        BBox   `json:"bbox"`
 	District    BBox   `json:"district"`
-	OSMBase     string `json:"osm_base"`
-	License     string `json:"license"`
+	// DistrictSource says where the district bbox comes from, when recorded.
+	DistrictSource string `json:"district_source,omitempty"`
+	OSMBase        string `json:"osm_base"`
+	License        string `json:"license"`
 }
 
 // BBox is south, west, north, east in degrees.
@@ -122,9 +139,22 @@ type Stats struct {
 	KM            float64
 }
 
-// Load decodes the embedded downtown Cairo graph.
-func Load() (*Graph, error) {
-	return Decode(bytes.NewReader(cairoDowntown))
+// Load decodes the embedded graph of the named district.
+func Load(district string) (*Graph, error) {
+	name, ok := files[district]
+	if !ok {
+		return nil, fmt.Errorf("roadgraph: unknown district %q (have %v)", district, Districts())
+	}
+	fh, err := embedded.Open(name)
+	if err != nil {
+		return nil, fmt.Errorf("roadgraph: %s: %w", district, err)
+	}
+	defer fh.Close()
+	g, err := Decode(fh)
+	if err != nil {
+		return nil, fmt.Errorf("roadgraph: %s: %w", district, err)
+	}
+	return g, nil
 }
 
 // Decode reads a gzipped File and expands it to a Graph.

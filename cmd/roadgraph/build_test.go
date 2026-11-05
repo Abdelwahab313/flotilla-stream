@@ -204,6 +204,17 @@ func TestDistrictInsideBBox(t *testing.T) {
 	if _, err := build([]byte(noDistrict), raw, "fixture"); err == nil {
 		t.Fatal("query without a district line accepted")
 	}
+	if f.Source.DistrictSource != "" {
+		t.Fatalf("district source %q from a query without one", f.Source.DistrictSource)
+	}
+	sourced := "// district-source assembled from way 1, node 2\n" + fixtureQuery
+	fs, err := build([]byte(sourced), raw, "fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fs.Source.DistrictSource != "assembled from way 1, node 2" {
+		t.Fatalf("district source = %q", fs.Source.DistrictSource)
+	}
 }
 
 func TestSCCDropsOnewayDeadEnd(t *testing.T) {
@@ -297,8 +308,14 @@ func TestSizeGuard(t *testing.T) {
 	if err := checkSize(len(b), len(b)-1); err == nil {
 		t.Fatal("file one byte over the limit passed")
 	}
-	if err := checkSize(roadgraph.MaxFileBytes+1, roadgraph.MaxFileBytes); err == nil {
-		t.Fatal("513th KB passed")
+	if roadgraph.MaxFileBytes != 1_048_576 {
+		t.Fatalf("limit is %d bytes, want 1,048,576", roadgraph.MaxFileBytes)
+	}
+	if err := checkSize(1_048_577, roadgraph.MaxFileBytes); err == nil {
+		t.Fatal("1,048,577 bytes passed")
+	}
+	if err := checkSize(1_048_576, roadgraph.MaxFileBytes); err != nil {
+		t.Fatalf("exactly 1 MB failed: %v", err)
 	}
 }
 
