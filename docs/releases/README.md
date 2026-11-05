@@ -7,7 +7,7 @@ in its file is ticked and the tag exists. One slice is `open` at a time.
 
 | Release | Size | Slice | Demo at the end | Status |
 | --- | :-: | --- | --- | --- |
-| [R0](R0.md) Walking skeleton | L | One driver's position travels device → log → projector → store → map | Dot moves; one trace spans the path | open |
+| [R0](R0.md) Walking skeleton | L | One driver's position travels device → log → projector → store → map | Dot moves; one trace spans the path | closed, `v0.0`, 2 sittings |
 | R1 Load source and baseline | M | Thousands of simulated drivers on real roads; first throughput and lag numbers | 1,000 drivers moving; baseline in README | — |
 | R2 Live dispatcher view | M | Cell-based live fan-out to many dashboards | Ten dashboards, each its own area; position-to-screen p99 | — |
 | R3 Zones and geofence events | M | Enter/exit/dwell; state rebuilt by replay | Zones light up; rebuild equals live | — |

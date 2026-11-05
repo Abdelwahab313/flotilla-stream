@@ -1,6 +1,6 @@
 # 0001 — Source of truth
 
-- Status: proposed
+- Status: accepted (R0, 2026-11-05)
 - Introduced in: R0
 
 ## Context

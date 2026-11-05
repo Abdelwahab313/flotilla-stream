@@ -5,7 +5,7 @@ about to show, runs it, and ends with the checker.
 
 | Script | Shows | Status |
 | --- | --- | --- |
-| `R0.sh` | One command → dot moves on the map → trace link | `make demo-r0` |
+| `R0.sh` | One command → dot moves on the map → trace link | done, `v0.0` (`make demo-r0`) |
 | `r1.sh` | 1,000 drivers; ingest rate, lag, latency board | todo |
 | `r2.sh` | Ten dashboards, each its own area; kill a gateway replica | todo |
 | `r3.sh` | Zones light up; rebuild from log equals live | todo |

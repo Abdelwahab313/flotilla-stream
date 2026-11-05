@@ -4,11 +4,11 @@ Numbered as the design decisions. One page each: Context · Options · Decision 
 
 | # | Decision | Release | Status |
 | --- | --- | --- | --- |
-| 0001 | [Source of truth](0001-source-of-truth.md) | R0 | proposed |
+| 0001 | [Source of truth](0001-source-of-truth.md) | R0 | accepted |
 | 0002 | [Partition keys](0002-partition-keys.md) | R0, R4a | proposed |
-| 0003 | [Delivery guarantee](0003-delivery-guarantee.md) | R0 | proposed |
+| 0003 | [Delivery guarantee](0003-delivery-guarantee.md) | R0 | accepted |
 | 0004 | [Ordering and late data](0004-ordering-and-late-data.md) | R1 | proposed |
-| 0005 | [Hot path vs cold path](0005-hot-path-vs-cold-path.md) | R0, R5 | proposed |
+| 0005 | [Hot path vs cold path](0005-hot-path-vs-cold-path.md) | R0, R5 | accepted (hot path); cold path proposed until R5 |
 | 0006 | [Dispatch concurrency](0006-dispatch-concurrency.md) | R4a | proposed |
 | 0007 | [Writes that cross a database and the log](0007-transactional-outbox.md) | R4a | proposed |
 | 0008 | [Backpressure](0008-backpressure.md) | R1, R8 | proposed |

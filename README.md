@@ -2,7 +2,7 @@
 
 flotilla-stream is a portfolio project: the real-time backbone of a delivery company, built by me to show how I would run one. Simulated drivers stream GPS positions. The system tracks each driver live, raises an event when a driver crosses a geofence, and assigns each order to the nearest available driver with no double assignment, including while a node or a whole zone is down. All traffic is synthetic. There is no real fleet behind it, and `simulator/` generates every driver, position and order you will see. Every number in this README will come from a test in this repo that you can rerun yourself.
 
-**Status:** R0 runs end to end on a local kind cluster, delivered by Argo CD. One simulated driver goes through the ingest gateway, Kafka, the location projector and Redis to a live map over WebSocket, and one trace spans all four services. R0 is still open; what stands between it and the `v0.0` tag is listed under Blockers in [`docs/releases/R0.md`](docs/releases/R0.md). Every component and tool below has a status: `R0 (in progress)`, `planned, Rn` or `open, chosen in Rn`. The release plan is in [`docs/releases/`](docs/releases/). The decisions I have made so far, with the alternatives I rejected, are in [`docs/decisions/`](docs/decisions/).
+**Status:** R0 is closed (tag `v0.0`). It runs end to end on a local kind cluster, delivered by Argo CD. One simulated driver goes through the ingest gateway, Kafka, the location projector and Redis to a live map over WebSocket, and one trace spans all four services. What R0 left for later is in the Deferred list of [`docs/releases/R0.md`](docs/releases/R0.md). Every component and tool below has a status: `R0` (built), `planned, Rn` or `open`. The release plan is in [`docs/releases/`](docs/releases/). The decisions I have made so far, with the alternatives I rejected, are in [`docs/decisions/`](docs/decisions/).
 
 ## Why this exists
 
@@ -25,10 +25,14 @@ Non-goals, from [`docs/product/PLAN.md`](docs/product/PLAN.md):
 
 ## Headline numbers
 
-None yet. This table fills in release by release, and each row will carry the command that produced it. The targets are design targets that R1 confirms or revises.
+This table fills in release by release. Every measured number was derived twice, and its command, raw files and both derivations are in `docs/results/Rn.md`. The targets are design targets that R1 confirms or revises.
 
 | Measure | Target | Measured | Release |
 | --- | --- | --- | --- |
+| Time to demo, cold: `make demo-r0` from a clean checkout on a new kind cluster, host caches warm | under 10 min | 426–468 s wall (n = 4); 390–412 s first pod created → last pod Ready. A machine with cold host caches on a slow network misses 10 minutes; the Go module download alone is the reason (results §1) | R0, [results](docs/results/R0.md#1-time-to-demo-make-demo-r0) |
+| Argo CD bootstrap: `make kind-down && make gitops-local` | — | 641 s wall; 575 s from the cluster's creation to the app deployed, `Synced`/`Healthy`, no retries | R0, [results](docs/results/R0.md#2-argo-cd-bootstrap-make-kind-down--make-gitops-local-at-abeb343) |
+| Service image size, uncompressed (`docker image inspect`) | — | simulator 16.3, ingest-gateway 22.6, live-gateway 23.9, location-projector 28.3 MB. `crictl` in the node reports 1.06 MB more for each | R0, [results](docs/results/R0.md#3-image-sizes-uncompressed-sha-abeb343) |
+| Local cluster memory, steady state, Argo CD installed | under the 7 GB docker minimum | median 2569 MiB (`docker stats`), 2568 MiB (kubelet summary) | R0, [results](docs/results/R0.md#5-memory-at-steady-state) |
 | Sustained ingest | 50,000 drivers at one update / 5 s = 10,000 events/s | — | R1, R8 |
 | Position-to-screen latency | p99 < 500 ms at target load | — | R2, R8 |
 | Latest-position query | p99 < 20 ms | — | R1 |
@@ -132,12 +136,12 @@ The live gateway never consumes `position.reported`, so positions reach it only 
 
 | Component | Responsibility | State | Scales by | Status |
 | --- | --- | --- | --- | --- |
-| Device simulator | Drives realistic movement on a real road network for any OpenStreetMap extract and runs load profiles. Adversarial by default: reordering, duplicates, reboots that reset sequence numbers, reconnect storms, clock skew. Honors retry-after. Later also accept, decline, late accepts and disconnects. A control API for the console's operator drawer (Day profile, order bursts, fault injection), deployed in the local overlay only | None | Simulator instances | R0 (in progress), one driver; roads and load in R1; control API C1 |
-| Ingest gateway | Authenticates devices, validates and normalizes reports, drops duplicates by device sequence, sheds load with retry-after, writes to the log keyed by driver. Writes device reports that can race a dispatcher (picked up, delivered, failed, duty) as commands | None | Connections and request rate | R0 (in progress); device commands from R4a |
-| Event log (Apache Kafka, KRaft mode) | Durable, ordered per partition, replayable, retained for days. The source of truth for movement and decisions | Partitions | Partition count | R0 (in progress), one broker, one topic |
-| Location projector | Driver owner. Keeps each driver's latest position (newest wins), the geo index, connectivity (live, stale, lost) and a capped 15-minute trail. Folds every zone owner's commitments into one activity (idle, offered, on route), emits `driver.lost_in_zone` for a lost driver carrying picked-up orders, owns duty commands, and forwards live positions to the live gateway | Hot state store | Partitions consumed | R0 (in progress); connectivity R2, lost R4b; activity R4c; trail R4d; duty and lost-in-zone C1 |
-| Hot state store (Redis) | Latest position and status per driver, plus a geo index for nearest queries | In memory, persisted for restart | Memory and shards | R0 (in progress) |
-| Live gateway | Holds console connections. Forwards events by map cell, by watched driver id (up to 10) and as a per-city event stream with its true rate and 1-in-N sampling, each event with its topic, partition and offset. Filters by fleet and city before sending. Serves latest-position and 15-minute trail queries from the hot store | Connection state | Connections | R0 (in progress); cells R2; city stream R3; fleet and city filter R3b; trail R4d; watch C1 |
+| Device simulator | Drives realistic movement on a real road network for any OpenStreetMap extract and runs load profiles. Adversarial by default: reordering, duplicates, reboots that reset sequence numbers, reconnect storms, clock skew. Honors retry-after. Later also accept, decline, late accepts and disconnects. A control API for the console's operator drawer (Day profile, order bursts, fault injection), deployed in the local overlay only | None | Simulator instances | R0, one driver; roads and load in R1; control API C1 |
+| Ingest gateway | Authenticates devices, validates and normalizes reports, drops duplicates by device sequence, sheds load with retry-after, writes to the log keyed by driver. Writes device reports that can race a dispatcher (picked up, delivered, failed, duty) as commands | None | Connections and request rate | R0: validate, normalize, static token, write to the log; dedupe and load shedding R1; device commands R4a |
+| Event log (Apache Kafka, KRaft mode) | Durable, ordered per partition, replayable, retained for days. The source of truth for movement and decisions | Partitions | Partition count | R0, one broker, one topic |
+| Location projector | Driver owner. Keeps each driver's latest position (newest wins), the geo index, connectivity (live, stale, lost) and a capped 15-minute trail. Folds every zone owner's commitments into one activity (idle, offered, on route), emits `driver.lost_in_zone` for a lost driver carrying picked-up orders, owns duty commands, and forwards live positions to the live gateway | Hot state store | Partitions consumed | R0; connectivity R2, lost R4b; activity R4c; trail R4d; duty and lost-in-zone C1 |
+| Hot state store (Redis) | Latest position and status per driver, plus a geo index for nearest queries | In memory, persisted for restart | Memory and shards | R0, on `emptyDir` with no rebuild after a restart (R0 Deferred) |
+| Live gateway | Holds console connections. Forwards events by map cell, by watched driver id (up to 10) and as a per-city event stream with its true rate and 1-in-N sampling, each event with its topic, partition and offset. Filters by fleet and city before sending. Serves latest-position and 15-minute trail queries from the hot store | Connection state | Connections | R0; cells R2; city stream R3; fleet and city filter R3b; trail R4d; watch C1 |
 | Zone processor | Runs point-in-polygon tests on each position, emits enter, exit and dwell, keeps per-driver zone membership rebuildable from the log | Local, rebuildable | Partitions consumed | planned, R3 |
 | Identity service | Seeded users, roles and allowed cities. Fleet-scoped API keys, hashed and shown once. Issues short-lived signed tokens that the gateways verify locally | Its own store | Request rate (low) | planned, R3b; API keys C2 |
 | Order service and outbox relay | Order API and import jobs, zone definitions and fleet settings. Writes each change and an outbox row in one transaction, and the relay publishes them to the log. Order status for API reads comes from the ops view, so the order store holds only what this service writes | Order store (Postgres) | Request rate (low) | planned, R4a; imports C2 |
@@ -279,8 +283,8 @@ This table lists the Kubernetes objects. Service status is in [Components](#comp
 | identity-service, console-api, ops-view query API | Deployment | Request-rate services; identity from R3b, ops view from R4d, console API from C1 |
 | checker | Runs after quiescing | Object kind not decided. A Job looks like the fit, but that is my assumption |
 | Kafka | Strimzi operator: `Kafka` and `KafkaNodePool` resources rendered through Kustomize | One combined KRaft node in R0. Separate controller and broker pools spread over three zones with rack awareness for decision 12 |
-| Redis, Postgres | Upstream Helm charts rendered through Kustomize | — |
-| Argo CD | Application syncing `main` through the overlay | Must report `Synced`/`Healthy` to close R0. The demo cluster becomes a second target in R3b |
+| Redis, Postgres | Redis: plain manifests in R0, on `emptyDir`. Postgres: planned, R4a | The upstream-chart rule below applies from the slice that replaces them |
+| Argo CD | Application syncing `main` through the overlay | Reported `Synced`/`Healthy` at `abeb343` to close R0. The demo cluster becomes a second target in R3b |
 | KEDA | ScaledObject per consumer | Scales on consumer lag, not CPU (decision 11) |
 | PodDisruptionBudgets | One per replicated component | Keep a minimum running during maintenance (decision 12). planned, R6b |
 | cert-manager | Certificate for the public demo URL | — |
@@ -288,11 +292,14 @@ This table lists the Kubernetes objects. Service status is in [Components](#comp
 
 Three rules apply to every manifest. Every resource has requests and limits. Every consumer Deployment has a `preStop` hook that drains in-flight work and commits offsets before exit, because a naive scale-in loses or duplicates work (decision 11). Third-party components come from their upstream Helm charts rendered through Kustomize, my own services are plain manifests, and no Helm chart is written in this repo.
 
-Planned layout, nothing in `deploy/` yet:
+Layout. `base/`, `bootstrap/`, `compose/`, `images/` and `overlays/local/` exist from R0; `demo/` and `gke/` are planned:
 
 ```
 deploy/
-  base/              shared by every environment
+  base/              shared by every environment: namespaces, kafka, strimzi, redis, tempo, services
+  bootstrap/argocd/  Argo CD install for kind (make gitops-local)
+  compose/           Tempo and Grafana config shared by docker compose and kind
+  images/            the one Dockerfile for every Go service
   overlays/
     local/           kind, from R0
     demo/            public always-on cluster, from R3b
@@ -327,10 +334,10 @@ sequenceDiagram
 
 | Stage | What runs | Status |
 | --- | --- | --- |
-| Every change | GitHub Actions: build and `go test` | R0 (in progress) |
+| Every change | GitHub Actions: build and `go test` | R0 |
 | Every change | Contract tests on event schemas (backward-compatibility check, decision 10) | planned, R3 |
 | Every change | Integration tests against real dependencies in containers | planned, release not set |
-| `main` | Images pushed to GHCR, Argo CD syncs the cluster to `deploy/` | R0 (in progress) |
+| `main` | Images pushed to GHCR, Argo CD syncs the cluster to `deploy/` | R0 |
 | Cloud | Terraform in `infra/` creates and destroys the GKE environment with one command. It owns cluster, node pools, buckets and registry, never Kubernetes objects | planned, R6a |
 | Release tag | Runs that release's demo script and the checker | planned |
 
@@ -348,32 +355,32 @@ Only tools named in the repo's plan, slice files or agent definitions.
 
 | Area | Tool | What it does here | Status |
 | --- | --- | --- | --- |
-| Language | Go 1.27.1 | Services, simulator and checker | R0 (in progress) |
+| Language | Go 1.27.1 | Services, simulator and checker | R0 |
 | Language | TypeScript, with Node at build and dev time only | The console | planned, R2 |
-| Language | Go client libraries: franz-go, go-redis v9, coder/websocket, OpenTelemetry Go | Clients for Kafka, Redis, WebSocket and OpenTelemetry | R0 (in progress) |
-| Messaging | Apache Kafka 4.x (KRaft) | The event log | R0 (in progress) |
-| Cluster and delivery | Strimzi | Runs Kafka on kind and GKE | R0 (in progress) |
-| Messaging | Redis pub/sub | Carries live positions from the location projector to the live gateway | R0 (in progress) |
+| Language | Go client libraries: franz-go, go-redis v9, coder/websocket, OpenTelemetry Go | Clients for Kafka, Redis, WebSocket and OpenTelemetry | R0 |
+| Messaging | Apache Kafka 4.x (KRaft) | The event log | R0 |
+| Cluster and delivery | Strimzi | Runs Kafka on kind and GKE | R0 |
+| Messaging | Redis pub/sub | Carries live positions from the location projector to the live gateway | R0 |
 | Messaging | Device channel for `offer.sent` | Delivers offers to the simulated device | open, chosen in R4b |
-| Storage | Redis | Latest position, geo index, dispatch reservations | R0 (in progress); reservations planned, R4a |
+| Storage | Redis | Latest position, geo index, dispatch reservations | R0; reservations planned, R4a |
 | Storage | Postgres | Order store and transactional outbox; the ops view's read model in its own database | planned, R4a; ops view R4d |
 | Storage | History store (columnar) | Trails, events and analytics queries | open, chosen in R5 |
-| Edge and UI | WebSocket | Live gateway push to dashboards | R0 (in progress) |
-| Edge and UI | Static HTML + MapLibre | The live map in R0 | R0 (in progress) |
+| Edge and UI | WebSocket | Live gateway push to dashboards | R0 |
+| Edge and UI | Static HTML + MapLibre | The live map in R0 | R0 |
 | Edge and UI | TypeScript + React 19 + MapLibre, built with Vite | The console, the dispatcher's product UI. Node is a build and dev tool only, and a Go binary serves the built files | planned, R2 |
-| Cluster and delivery | `docker compose` | R0 sitting 1: the pipe without Kubernetes, with Kafka, Redis and Tempo | R0 (in progress) |
-| Cluster and delivery | kind | Local Kubernetes cluster | R0 (in progress) |
-| Cluster and delivery | Kustomize | One base, overlays `local`, `demo` and `gke` | R0 (in progress); `demo` overlay R3b, `gke` R6a |
-| Cluster and delivery | Helm (upstream charts) | Third-party components, rendered through Kustomize | R0 (in progress) |
-| Cluster and delivery | Argo CD | Syncs `main` to each cluster | R0 (in progress); second target R3b |
-| Cluster and delivery | GitHub Actions | Build, `go test`, image push | R0 (in progress) |
-| Cluster and delivery | GHCR | Container images | R0 (in progress) |
-| Cluster and delivery | Make | `make demo-r0` | R0 (in progress) |
+| Cluster and delivery | `docker compose` | R0 sitting 1: the pipe without Kubernetes, with Kafka, Redis and Tempo | R0 |
+| Cluster and delivery | kind | Local Kubernetes cluster | R0 |
+| Cluster and delivery | Kustomize | One base, overlays `local`, `demo` and `gke` | R0; `demo` overlay R3b, `gke` R6a |
+| Cluster and delivery | Helm (upstream charts) | Third-party components, rendered through Kustomize | R0, Strimzi only |
+| Cluster and delivery | Argo CD | Syncs `main` to each cluster | R0; second target R3b |
+| Cluster and delivery | GitHub Actions | Build, `go test`, image push | R0 |
+| Cluster and delivery | GHCR | Container images | R0 |
+| Cluster and delivery | Make | `make demo-r0` | R0 |
 | Cluster and delivery | cert-manager | TLS for the public demo | planned, R3b |
 | Cluster and delivery | KEDA | Lag-based autoscaling of consumers | planned, R6b |
-| Observability | OpenTelemetry | Trace context carried in every event | R0 (in progress) |
+| Observability | OpenTelemetry | Trace context carried in every event | R0, in Kafka record headers; in the event envelope R3 (decision 10) |
 | Observability | OTel collector | Receives and forwards telemetry. Not in R0: services export OTLP straight to Tempo (`deploy/base/services/*.yaml`) | open, no slice assigned |
-| Observability | Tempo | Trace storage and viewing | R0 (in progress) |
+| Observability | Tempo | Trace storage and viewing | R0 |
 | Observability | Prometheus | Metrics, and one of the two sources `bench-runner` derives numbers from | planned, R1 |
 | Observability | Metrics dashboard tool | Golden-signals and SLO boards | open, chosen in R1 |
 | Cost | OpenCost | Allocates node and store cost to namespaces and workloads, with a budget alert and cost per 1,000 drivers as a panel (decision 14) | planned, R3b and R8 |
@@ -384,7 +391,7 @@ Only tools named in the repo's plan, slice files or agent definitions.
 
 ## Decisions
 
-Seventeen records, one page each: Context, Options, Decision, Consequences, How it was tested. All are `proposed` until the release that introduces them accepts them. R0 has to accept 0001, 0003 and 0005.
+Seventeen records, one page each: Context, Options, Decision, Consequences, How it was tested. All are `proposed` until the release that introduces them accepts them. R0 accepted 0001 and 0003, and 0005 for the hot path; the cold path waits for R5.
 
 | # | Decision | Choice | Release |
 | --- | --- | --- | --- |
@@ -429,7 +436,7 @@ Time-driven facts (connectivity, offer expiry, lateness) run on event time, neve
 
 ```mermaid
 flowchart LR
-  R0["R0 Walking skeleton<br/>L, open"] --> R1["R1 Load baseline<br/>M"] --> R2["R2 Live view<br/>M"] --> R3["R3 Zones<br/>M"] --> R3b["R3b Public demo<br/>M"] --> R4a["R4a Dispatch<br/>L"]
+  R0["R0 Walking skeleton<br/>L, closed"] --> R1["R1 Load baseline<br/>M"] --> R2["R2 Live view<br/>M"] --> R3["R3 Zones<br/>M"] --> R3b["R3b Public demo<br/>M"] --> R4a["R4a Dispatch<br/>L"]
   R4a --> V04{{"v0.4 cut"}} --> R4b["R4b Offers<br/>L"] --> R4c["R4c Multi-order routes<br/>M"] --> R4d["R4d Ops view<br/>M"] --> V05{{"v0.5 cut"}}
   V05 --> R5["R5 History<br/>S"] --> C1["C1 Operations console<br/>L"] --> C2["C2 Integrations<br/>M"]
   C2 --> R6a["R6a Cloud env<br/>M"] --> R6b["R6b Elasticity<br/>L"] --> R7["R7 SLOs<br/>S"] --> R8["R8 Load proof<br/>M"] --> R9["R9 Failure proof<br/>M"] --> R10["R10 v1.0<br/>S"]

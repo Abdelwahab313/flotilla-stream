@@ -1,6 +1,6 @@
 # 0005 — Hot path vs cold path
 
-- Status: proposed. At R0 close: accepted for the hot path (R0); the cold path stays proposed until R5
+- Status: accepted for the hot path (R0, 2026-11-05); the cold path stays proposed until R5
 - Introduced in: R0, R5
 
 ## Context
