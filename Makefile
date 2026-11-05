@@ -23,10 +23,13 @@ else
 TAG := sha-$(SHORT)
 endif
 
-.PHONY: demo-r0 up-local preflight images kind-up kind-load deploy-local kind-down tag gitops-local gitops-preflight
+.PHONY: demo-r0 roadgraph up-local preflight images kind-up kind-load deploy-local kind-down tag gitops-local gitops-preflight
 
 demo-r0:
 	demo/R0.sh
+
+roadgraph:
+	go run ./cmd/roadgraph -query cmd/roadgraph/cairo-downtown.overpassql -out simulator/roadgraph/cairo-downtown.json.gz
 
 tag:
 	@echo $(TAG)
